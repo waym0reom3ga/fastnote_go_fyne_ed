@@ -1,0 +1,11 @@
+test: binary_size
+  libs: none
+  notes: Self-contained Go binary. Fyne embeds ~34 MB of fonts/icons via go:embed (NotoSans, EmojiOneColor, DejaVuSansMono). Only libc/libm/libgcc external.
+
+test: peak_ram_profile
+  capable: yes
+  notes: Requires display. Fyne uses OpenGL via GLFW.
+
+test: gui_tools
+  capable: yes
+  notes: Fyne v2.7.3. test.Tap for widget events.
