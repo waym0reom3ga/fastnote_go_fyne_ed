@@ -11,12 +11,14 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
@@ -276,6 +278,9 @@ func (ui *FastNoteApp) RebuildControls() {
 		{Name: "Export", X0: 228, Y0: 6, X1: 296, Y1: tb - 6, Handler: func() { ui.onExport("html") }},
 		{Name: "ExportPdf", X0: 302, Y0: 6, X1: 378, Y1: tb - 6, Handler: func() { ui.onExport("pdf") }},
 		{Name: "Theme", X0: 384, Y0: 6, X1: 452, Y1: tb - 6, Handler: ui.onTheme},
+		// Editor rect for the measurement harness to click into the text area.
+		// Window is 1080x740, toolbar is 34px, editor is left half of content.
+		{Name: "editor", X0: 0, Y0: tb, X1: 540, Y1: 700, Handler: nil},
 	}
 }
 
@@ -317,6 +322,35 @@ func (ui *FastNoteApp) buildUI() {
 		container.NewBorder(nil, nil, nil, nil, container.NewVBox(toolbar, split))))
 	ui.RebuildControls()
 	ui.buildBrowserWindow()
+
+	// Keyboard accelerators (spec 5.2) using Fyne's shortcut system
+	canvas := ui.win.Canvas()
+
+	canvas.AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyO, Modifier: fyne.KeyModifierControl},
+		func(fyne.Shortcut) { ui.onOpen() })
+	canvas.AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyS, Modifier: fyne.KeyModifierControl},
+		func(fyne.Shortcut) { ui.onSave() })
+	canvas.AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyS, Modifier: fyne.KeyModifierControl | fyne.KeyModifierShift},
+		func(fyne.Shortcut) { ui.onSaveAs() })
+	canvas.AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyE, Modifier: fyne.KeyModifierControl},
+		func(fyne.Shortcut) { ui.onExport("html") })
+	canvas.AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyE, Modifier: fyne.KeyModifierControl | fyne.KeyModifierShift},
+		func(fyne.Shortcut) { ui.onExport("pdf") })
+
+	// Browser keyboard contract (spec 3.2)
+	canvas.SetOnTypedKey(func(ev *fyne.KeyEvent) {
+		if ui.Browser != nil {
+			if ev.Name == fyne.KeyReturn || ev.Name == fyne.KeyEnter {
+				ui.confirmBrowser()
+				return
+			}
+			if ev.Name == fyne.KeyEscape {
+				ui.Browser = nil
+				ui.browserWin.Hide()
+				return
+			}
+		}
+	})
 }
 
 func (ui *FastNoteApp) buildBrowserWindow() {
@@ -395,6 +429,18 @@ func (ui *FastNoteApp) renderBrowserList() {
 	ui.list.Refresh()
 }
 
+// writeControlMap dumps the control rectangles to a TSV file so the
+// measurement harness can click them at their real positions.
+func writeControlMap(path string, controls []*Control) {
+	var buf strings.Builder
+	buf.WriteString("name	x	y	w	h\n")
+	for _, c := range controls {
+		buf.WriteString(fmt.Sprintf("%s	%d	%d	%d	%d\n",
+			c.Name, int(c.X0), int(c.Y0), int(c.X1-c.X0), int(c.Y1-c.Y0)))
+	}
+	os.WriteFile(path, []byte(buf.String()), 0o644)
+}
+
 // RunGUI starts the Fyne application (needs a display).
 func RunGUI(state *AppState, openPath string) {
 	ui := NewFastNoteApp(state)
@@ -403,5 +449,6 @@ func RunGUI(state *AppState, openPath string) {
 	if openPath != "" {
 		ui.openPath(openPath)
 	}
+	FnEvent(state, "painted")
 	ui.win.ShowAndRun()
 }

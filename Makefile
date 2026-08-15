@@ -1,17 +1,16 @@
-.PHONY: build selftest clicks test clean
+.PHONY: build test-ui test clean
 
 BIN := fastnotes
 
 build:
 	go build -o $(BIN) .
 
-selftest: build
-	./$(BIN) --headless --notes-dir /tmp/fastnote_notes --selftest
-
-clicks: build
+test-ui: build
 	go test -count=1 -run TestUI .
 
-test: selftest clicks
+test: build
+	./$(BIN) --version
+	$(MAKE) test-ui
 
 clean:
 	rm -f $(BIN)

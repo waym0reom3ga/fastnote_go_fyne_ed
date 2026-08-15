@@ -1,8 +1,7 @@
-// FastNote go_gio — entry point.
+// FastNote go_fyne — entry point.
 //
-// CLI seams (spec §5): --open/--insert/--save/--export plus --headless,
-// --selftest, --version.  Unknown flags exit non-zero (argparse-style, so a
-// binary that ignores flags cannot fool the acceptance harness).
+// Exactly two permitted flags (spec §5.1): --version and --event-file.
+// Unknown flags exit non-zero.
 
 package main
 
@@ -15,31 +14,19 @@ import (
 const usage = `FastNote - markdown editor
 
 Usage:
-  fastnote [flags] [--open FILE] [--insert TEXT] [--save] [--export PATH]
+  fastnote [flags]
 
 Flags:
-  --open PATH      open a file
-  --insert TEXT    insert text at the document end
-  --save           write the document to disk
-  --export PATH    export HTML (or PDF when PATH ends in .pdf)
-  --headless       stay in the CLI; never open a window
-  --notes-dir DIR  the user notes directory (default: home)
-  --selftest       run the internal self-test suite
   --version        print the version
+  --event-file P   append phase markers (painted/open/save/etc.) to P
   --help           print this help
 `
 
 func runCLI(args []string) int {
 	fs := flag.NewFlagSet("fastnote", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
-	openPath := fs.String("open", "", "")
-	insert := fs.String("insert", "", "")
-	doSave := fs.Bool("save", false, "")
-	exportPath := fs.String("export", "", "")
-	headless := fs.Bool("headless", false, "")
-	notesDir := fs.String("notes-dir", "", "")
-	doSelftest := fs.Bool("selftest", false, "")
 	doVersion := fs.Bool("version", false, "")
+	eventFile := fs.String("event-file", "", "")
 	doHelp := fs.Bool("help", false, "")
 
 	if err := fs.Parse(args); err != nil {
@@ -58,24 +45,10 @@ func runCLI(args []string) int {
 		fmt.Print(usage)
 		return 0
 	}
-	if *doSelftest {
-		if RunSelfTest() {
-			return 0
-		}
-		return 1
-	}
 
-	state := NewAppState(*notesDir)
-	if err := RunCLIActions(state, *openPath, *insert, *doSave, *exportPath); err != nil {
-		fmt.Fprintf(os.Stderr, "fastnote: %v\n", err)
-		return 1
-	}
-
-	if *headless {
-		return 0
-	}
-
-	RunGUI(state, *openPath)
+	state := NewAppState("")
+	state.EventFile = *eventFile
+	RunGUI(state, "")
 	return 0
 }
 
